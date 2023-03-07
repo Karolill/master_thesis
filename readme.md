@@ -1,6 +1,6 @@
-# Masters Tehsis
+# Master's Thesis
 
-This repository contains the code used for my masters thesis. 
+This repository contains the code used for my master's thesis. 
 The thesis focuses on transformer based language models (in this case various BERT models), 
 that will be trained and tested on the NoReC dataset and a dataset from Sparebank 1 SMN. 
 The NoReC dataset is openly available on [github](https://github.com/ltgoslo/norec). 

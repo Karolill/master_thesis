@@ -1,0 +1,10 @@
+/models*
+/scores*
+/norec_original
+/old_models
+/training_output
+/best_models_paths
+/test_code
+.ipynb_checkpoints
+
+.idea

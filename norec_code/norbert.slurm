@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --partition=GPUQ
 #SBATCH --account=ie-idi
-#SBATCH --time=06:00:00
+#SBATCH --time=01:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=64000
 #SBATCH --gres=gpu:A100m40:1
 #SBATCH --constraint=A100
-#SBATCH --job-name="nb-bert"
-#SBATCH --output="nb-bert-output.out"
+#SBATCH --job-name="norBert"
+#SBATCH --output="norBert-output.out"
 #SBATCH --mail-user=karolill@stud.ntnu.no
 #SBATCH --mail-type=ALL
 
@@ -18,5 +18,5 @@ module load CUDA/11.3.1
 module load cuDNN/8.2.1.32-CUDA-11.3.1
 
 python model_training_and_evaluation.py \
-        --model_path 'NbAiLab/nb-bert-large' \
-        --model_name 'nb-bert'
+        --model_path 'ltgoslo/norbert2' \
+        --model_name 'norbert'

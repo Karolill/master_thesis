@@ -4,7 +4,6 @@ import pandas as pd
 import numpy as np
 import sklearn
 import argparse
-import math
 from evaluate import load
 from datasets import load_dataset
 from transformers import (
@@ -54,21 +53,16 @@ def create_and_train_model(
     :returns the path to the fine-tuned model
     """
 
-    print('-'*100 + '\n' + model_name + ' ' + str(lr))
-
-    # Define model parameters
-    warmup_proportion = 0.1
-    steps = math.ceil(len(train_encoding) / 8)
-    warmup_steps = round(steps * warmup_proportion * epochs)
+    print(f'-------------------------- {model_name} LR: {lr} -------------------------')
 
     # Create the model by getting the pre-trained one
     model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=2)
 
     # Create a trainer which specifies the training parameters
     training_args = TrainingArguments(
-        output_dir='../training_output/trainer_' + model_name + str(lr),
+        output_dir=f'../training_output/trainer_{model_name}_LR{lr}',
         learning_rate=lr,
-        warmup_steps=warmup_steps,
+        warmup_ratio=0.1,
         evaluation_strategy='epoch',
         num_train_epochs=epochs,
         load_best_model_at_end=True,  # Add this and next two lines so the best model will be saved
@@ -88,7 +82,7 @@ def create_and_train_model(
         )
         return f1
 
-    print('Starting to train ' + model_name + ' with learning rate ' + str(lr))
+    print(f'Starting to train {model_name} with learning rate {lr}')
 
     # Create trainer
     trainer = Trainer(
@@ -102,28 +96,20 @@ def create_and_train_model(
     # fine-tune model
     trainer.train()
 
-    print('Done training ' + model_name + ' with learning rate ' + str(lr))
+    print(f'Done training {model_name} with learning rate {lr}')
 
     # save the model to a folder so it can be used later, because load_best_model_at_end=True, the model from the best
     # checkpoint will be saved
-    directory = '..models/models_try9/' + model_name + '_lr' + str(lr)
+    directory = f'../models/models_try10/{model_name}_LR{lr}'
     tokenizer.save_pretrained(directory)
     model.save_pretrained(directory)
 
-    # The models are saved, but to make the best one easy to find, the filepath will be saved to a file
-    best_model_path = trainer.state.best_model_checkpoint
-    best_model_directory = '../best_models_paths/try9_' + model_name + '_lr' + str(lr)
-    text_file = open(best_model_directory, 'w')
-    n = text_file.write(best_model_path)
-    text_file.close()
-
     # Save information about loss, f1-score, runtime ++ for each epoch in a folder
-    state_directory = '../scores/scores_try9/state_M' + model_name + '_lr' + str(lr)
+    state_directory = f'../scores/scores_try10/state_{model_name}_LR{lr}'
     text_file = open(state_directory, 'w')
     n = text_file.write(str(trainer.state.log_history))
     text_file.close()
 
-    # print(model_name + ' is saved to folder ' + directory)
     print(f"Done training {model_name} with learning rate {lr}")
 
     # return directory name so both model and tokenizer can be fetched later
@@ -146,7 +132,7 @@ def predict_from_fine_tuned_model(model_path: str, test_dataset: List[str]) -> p
     fetched_tokenizer = AutoTokenizer.from_pretrained(model_path)
 
     # Create a classifier
-    classifier = pipeline(task='sentiment-analysis', model=fetched_model, tokenizer=fetched_tokenizer)
+    classifier = pipeline(task='sentiment-analysis', model=fetched_model, tokenizer=fetched_tokenizer, device=0)
 
     # The input can not be too big, set to the same size as used during fine-tuning
     tokenizer_kwargs = {'padding': True, 'truncation': True, 'max_length': 512}
@@ -180,7 +166,7 @@ def report_evaluation(predicted_labels_string: List[str], actual_labels: List[in
             predicted_labels.append(1)
 
     test_results = sklearn.metrics.classification_report(actual_labels, predicted_labels)
-    path = '../scores/scores_try9/test_M' + model_name + '_LR' + str(lr)
+    path = f'../scores/scores_try10/test_{model_name}_LR{lr}'
     text_file = open(path, 'w')
     n = text_file.write(test_results)
     text_file.close()
@@ -212,7 +198,6 @@ if __name__ == "__main__":
     # The training and test datasets must be tokenized before they can be passed to the trainer.
     tokenizer = AutoTokenizer.from_pretrained(model_path)
 
-    # train_encoding = train.map(  # This was used when data was loaded from pandas dataframe
     init_train_encoding = train.map(
         tokenize_function,
         batched=True
@@ -240,7 +225,7 @@ if __name__ == "__main__":
             lr=lr,
             model_path=model_path,
             model_name=model_name,
-            epochs=20,
+            epochs=5,
             training_data=train_encoding,
             eval_data=evaluate_encoding,
         )
@@ -251,8 +236,8 @@ if __name__ == "__main__":
         runtime = time.time() - start_time
 
         # save runtime for predictions
-        time_string = 'Time used to do evaluation with ' + model_name + ': ' + str(runtime)
-        path = '../scores/scores_try9/testTime_M' + model_name + '_LR' + str(lr)
+        time_string = f'Time used to do evaluation with {model_name} with LR {lr}: {runtime}'
+        path = f'../scores/scores_try10/testTime_{model_name}_LR{lr}'
         time_file = open(path, 'w')
         m = time_file.write(time_string)
         time_file.close()

@@ -1,6 +1,8 @@
 /models*
 /scores*
 /norec_original
+/norec_preprocessed/mini*
+/norec_preprocessed/100*
 /old_models
 /training_output
 /best_models_paths

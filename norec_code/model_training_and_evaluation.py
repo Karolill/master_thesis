@@ -1,24 +1,24 @@
-import time
-from typing import List
-import pandas as pd
+from typing import Tuple
 import numpy as np
-import sklearn
 import argparse
 from evaluate import load
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
 from transformers import (
     AutoModelForSequenceClassification,
     Trainer,
     TrainingArguments,
     AutoTokenizer,
-    pipeline
 )
 import torch
-
+from plotting import *
 
 # This code will be used to find the best parameters for a given language model
-# The parameters tuned will be XXX and XXX. The possible values of these parameters
-# are based on information from XXX.
+# The parameters tuned will be the number of epochs, learning_rate, warmup_ratio, optimizer and weight_decay (if
+# optimizer is adamw_hf).
+# The possible learning rates and warmup ratios are based on https://aclanthology.org/2021.nodalida-main.3
+# I decided to try one adamw optimizer and the adafactor one.
+# It does not seem like training for many epochs improves the score (after some trial and error). Therefore the models
+# are only trained for 5 epochs, and the best model is chosen.
 
 # The code is partially based on the following codes:
 # https://colab.research.google.com/gist/peregilk/3c5e838f365ab76523ba82ac595e2fcc/nbailab-finetuning-and-evaluating-a-bert-model-for-classification.ipynb#scrollTo=4utMn85m12vB
@@ -32,57 +32,85 @@ def tokenize_function(examples):
     return tokenizer(examples['text'], truncation=True, padding=True, max_length=512)
 
 
+# Create a function to evaluate the training. F1-score and precision for negative class is used
+f1_metric = load('f1')
+precision_metric = load("precision")
+
+
+def compute_metrics(eval_pred):
+    logits, labels = eval_pred
+    predictions = np.argmax(logits, axis=-1)
+
+    # It is more important to discover the negative classes than the positive ones, therefore the F1-score of the
+    # negative class is being used.
+    f1 = f1_metric.compute(
+        predictions=predictions,
+        references=labels,
+        average='binary',
+        pos_label=0,
+    )
+
+    # As it is not desirable to misclassify a lot of positive examples (but this seems to be an issue), the
+    # precision of the negative class will also be returned. The lower this precision is, the more positive exampels
+    # are misclassified.
+    precision = precision_metric.compute(
+        predictions=predictions,
+        references=labels,
+        average='binary',
+        pos_label=0,
+    )
+
+    return {'f1_neg': f1, 'precision_neg': precision}
+
+
 def create_and_train_model(
-        lr: float,
         model_path: str,
         model_name: str,
-        epochs: float,
-        training_data,
-        eval_data,
-) -> str:
+        training_data: Dataset,
+        eval_data: Dataset,
+        epochs: float = 5,
+        learning_rate: float = 2e-5,
+        warmup_ratio: float = 0,
+        optimizer: str = 'adamw_hf',
+        weight_decay: float = 0,
+) -> Tuple[str, str]:
     """
     Create a model based on a pretrained model, then fine-tune the model and save it to a file.
     Args:
-        lr: the learning rate to use.
-        model_path: path that is used to load the pre-trained model (sometimes just the model name)
-        model_name: chosen name of the model being trained
-        warmup_steps: Number of steps used for a linear warmup from 0 to learning_rate.
-        epochs: number of epochs to train the model
-        training_data: training dataset (encoded) to use for fine-tuning
-        eval_data: evaluation dataset (encoded) to use for evaluation during fine-tuning
+        :param model_path: path that is used to load the pre-trained model (sometimes just the model name)
+        :param model_name: chosen name of the model being trained
+        :param training_data: training dataset (encoded) to use for fine-tuning
+        :param eval_data: evaluation dataset (encoded) to use for evaluation during fine-tuning
+        :param epochs: number of epochs to train the model
+        :param learning_rate: the learning rate to use
+        :param warmup_ratio: Ratio of total training steps used for a linear warmup from 0 to learning_rate
+        :param optimizer: The optimizer to use. Either adamw_hf, adamw_torch, adamw_apex_fused, adamw_anyprecision or
+        adafactor.
+        :param weight_decay: The weight decay to apply (if not zero) to all layers except all bias and LayerNorm weights
+        in AdamW optimizer.
     :returns the path to the fine-tuned model
     """
-
-    print(f'-------------------------- {model_name} LR: {lr} -------------------------')
 
     # Create the model by getting the pre-trained one
     model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=2)
 
-    # Create a trainer which specifies the training parameters
+    # Specify training arguments so they can be sent to the trainer later
     training_args = TrainingArguments(
-        output_dir=f'../training_output/trainer_{model_name}_LR{lr}',
-        learning_rate=lr,
-        warmup_ratio=0.1,
+        output_dir=f'../training_output/trainer_{model_name}_LR{learning_rate}_WR{warmup_ratio}_OPTIM{optimizer}_'
+                   f'WD{weight_decay}',
+        learning_rate=learning_rate,
+        warmup_ratio=warmup_ratio,
+        weight_decay=weight_decay,
+        optim=optimizer,
         evaluation_strategy='epoch',
         num_train_epochs=epochs,
         load_best_model_at_end=True,  # Add this and next two lines so the best model will be saved
-        metric_for_best_model='f1',
+        metric_for_best_model='f1_neg',
         save_strategy='epoch',
     )
 
-    # Create a function to evaluate the training, f1-score for negative class is used
-    f1_metric = load('f1')
-
-    def compute_metrics(eval_pred):
-        logits, labels = eval_pred
-        predictions = np.argmax(logits, axis=-1)
-        f1 = f1_metric.compute(
-            predictions=predictions,
-            references=labels,
-        )
-        return f1
-
-    print(f'Starting to train {model_name} with learning rate {lr}')
+    print(f'Starting to train {model_name} with LR: {learning_rate}, WR: {warmup_ratio}, OPTIM: {optimizer} and WD: '
+          f'{weight_decay}')
 
     # Create trainer
     trainer = Trainer(
@@ -96,89 +124,36 @@ def create_and_train_model(
     # fine-tune model
     trainer.train()
 
-    print(f'Done training {model_name} with learning rate {lr}')
+    print(f'Done training {model_name} with LR: {learning_rate}, WR: {warmup_ratio}, OPTIM: {optimizer} and WD: '
+          f'{weight_decay}')
 
-    # save the model to a folder so it can be used later, because load_best_model_at_end=True, the model from the best
+    # save the model to a folder so it can be used later. Since load_best_model_at_end=True, the model from the best
     # checkpoint will be saved
-    directory = f'../models/models_try10/{model_name}_LR{lr}'
-    tokenizer.save_pretrained(directory)
-    model.save_pretrained(directory)
+    model_directory = f'../models/models_final_tuning/{model_name}_LR{learning_rate}_WR{warmup_ratio}_' \
+                      f'OPTIM{optimizer}_WD{weight_decay}'
+    tokenizer.save_pretrained(model_directory)
+    model.save_pretrained(model_directory)
 
     # Save information about loss, f1-score, runtime ++ for each epoch in a folder
-    state_directory = f'../scores/scores_try10/state_{model_name}_LR{lr}'
+    state_directory = f'../scores/scores_final_tuning/state_{model_name}_LR{learning_rate}_WR{warmup_ratio}_' \
+                      f'OPTIM{optimizer}_WD{weight_decay}'
     text_file = open(state_directory, 'w')
-    n = text_file.write(str(trainer.state.log_history))
+    text_file.write(str(trainer.state.log_history))
     text_file.close()
 
-    print(f"Done training {model_name} with learning rate {lr}")
+    print(f'Done saving {model_name} with LR: {learning_rate}, WR: {warmup_ratio}, OPTIM: {optimizer} and WD: '
+          f'{weight_decay}')
 
-    # return directory name so both model and tokenizer can be fetched later
-    return directory
-
-
-def predict_from_fine_tuned_model(model_path: str, test_dataset: List[str]) -> pd.DataFrame:
-    """
-    Make prediction on a dataset using a fine-tuned model.
-    Args:
-        model_path: file path to the fine-tuned model that should be used
-        test_dataset: a list containing the texts that sentiment analysis should be performed on
-    Returns:
-        a dataframe with the columns |Text|Label|Score| where the the text is the input text and the
-        label is the predicted label. The score is the probability that the label is correct.
-    """
-
-    # Get the fine-tuned model
-    fetched_model = AutoModelForSequenceClassification.from_pretrained(model_path)
-    fetched_tokenizer = AutoTokenizer.from_pretrained(model_path)
-
-    # Create a classifier
-    classifier = pipeline(task='sentiment-analysis', model=fetched_model, tokenizer=fetched_tokenizer, device=0)
-
-    # The input can not be too big, set to the same size as used during fine-tuning
-    tokenizer_kwargs = {'padding': True, 'truncation': True, 'max_length': 512}
-    result = classifier(test_dataset, **tokenizer_kwargs)
-
-    # Create a dataframe containing the results
-    data = {
-            'Text': test_dataset,
-            'Label': [d['label'] for d in result],
-            'Score': [d['score'] for d in result],
-           }
-    result_df = pd.DataFrame(data)
-    return result_df
-
-
-def report_evaluation(predicted_labels_string: List[str], actual_labels: List[int]) -> None:
-    """
-    Evaluate the predictions made by the model, and print the evaluation.
-    Args:
-        predicted_labels_string: a list containing the labels predicted by the model
-        actual_labels: the actual labels of the dataset
-    Returns:
-        None
-    """
-
-    predicted_labels = []
-    for prediction in predicted_labels_string:
-        if prediction == 'LABEL_0':
-            predicted_labels.append(0)
-        else:
-            predicted_labels.append(1)
-
-    test_results = sklearn.metrics.classification_report(actual_labels, predicted_labels)
-    path = f'../scores/scores_try10/test_{model_name}_LR{lr}'
-    text_file = open(path, 'w')
-    n = text_file.write(test_results)
-    text_file.close()
-    print(test_results)
+    # return directory name of model so both model and tokenizer can be fetched later, and state_directory so that the
+    # results can be automatically fetched and plotted later
+    return model_directory, state_directory
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
 
-    # These arguments will allow you to specify which model you are using
-    # and the batch size from the terminal
+    # These arguments will allow you to specify which model you are using from the terminal
     arg("--model_path", default='NbAiLab/nb-bert-large')
     arg("--model_name", default='nb-bert')
 
@@ -191,11 +166,11 @@ if __name__ == "__main__":
     # Huggingface models use huggingface datasets, which is why load_dataset is used
     train = load_dataset('csv', data_files='../norec_preprocessed_no_neutral/train_balanced_norec_dataset.csv')
     evaluate = load_dataset('csv', data_files='../norec_preprocessed/eval_norec_dataset.csv')
-    test = load_dataset('csv', data_files='../norec_preprocessed/test_norec_dataset.csv')
 
     # Tokenize data
 
-    # The training and test datasets must be tokenized before they can be passed to the trainer.
+    # The training and test datasets must be tokenized before they can be passed to the trainer, as BERT does not
+    # understand plain text.
     tokenizer = AutoTokenizer.from_pretrained(model_path)
 
     init_train_encoding = train.map(
@@ -212,37 +187,46 @@ if __name__ == "__main__":
     # the following must be done:
     train_encoding = init_train_encoding['train']
     evaluate_encoding = init_eval_encoding['train']
-    test_texts = test['train']['text']
-    test_labels = test['train']['label']
 
-    # Create/train model and then test it
+    # Create/train model.
+    # The parameters will be tuned by a gridsearch over the following values:
+    learning_rates = [2e-5, 3e-5, 4e-5, 5e-5]
+    warmup_ratios = [0, 0.01, 0.1]
+    optimizers = ['adamw_hf', 'adafactor']
+    weight_decays = [0, 0.01, 0.1]
 
-    # Four different learning rates will be tried
-    learning_rates = [2e-5]  # , 3e-5, 4e-5, 5e-5]
+    eval_scores_addresses = []  # List to save file paths to all files containing evaluation metrics
 
     for lr in learning_rates:
-        fine_tuned_model_directory = create_and_train_model(
-            lr=lr,
-            model_path=model_path,
-            model_name=model_name,
-            epochs=5,
-            training_data=train_encoding,
-            eval_data=evaluate_encoding,
-        )
+        for wr in warmup_ratios:
+            for optim in optimizers:
+                # weight_decay is a parameter that only affects adamw optimizer
+                if optim == 'adamw_hf':
+                    for wd in weight_decays:
+                        fine_tuned_model_directory, eval_scores = create_and_train_model(
+                            model_path=model_path,
+                            model_name=model_name,
+                            training_data=train_encoding,
+                            eval_data=evaluate_encoding,
+                            epochs=5,
+                            learning_rate=lr,
+                            warmup_ratio=wr,
+                            optimizer=optim,
+                            weight_decay=wd,
+                        )
+                        eval_scores_addresses.append(eval_scores)
+                else:
+                    fine_tuned_model_directory, eval_scores = create_and_train_model(
+                        model_path=model_path,
+                        model_name=model_name,
+                        training_data=train_encoding,
+                        eval_data=evaluate_encoding,
+                        epochs=5,
+                        learning_rate=lr,
+                        warmup_ratio=wr,
+                        optimizer=optim,
+                    )
+                    eval_scores_addresses.append(eval_scores)
 
-        # Testing
-        start_time = time.time()
-        results = predict_from_fine_tuned_model(fine_tuned_model_directory, test_texts)
-        runtime = time.time() - start_time
-
-        # save runtime for predictions
-        time_string = f'Time used to do evaluation with {model_name} with LR {lr}: {runtime}'
-        path = f'../scores/scores_try10/testTime_{model_name}_LR{lr}'
-        time_file = open(path, 'w')
-        m = time_file.write(time_string)
-        time_file.close()
-
-        # Compare predictions to real values
-        predicted_labels = results['Label']
-        print(f"The results of {model_name} using lr={lr} after 20 epochs: ")
-        report_evaluation(predicted_labels, test_labels)
+            plot_from_file(eval_scores_addresses)
+            eval_scores_addresses = []

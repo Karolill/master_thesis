@@ -9,5 +9,6 @@
 /best_models_paths
 /test_code
 .ipynb_checkpoints
+/norec_code/__pycache__
 
 .idea

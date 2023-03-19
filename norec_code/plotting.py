@@ -1,5 +1,6 @@
 from typing import List
 import matplotlib.pyplot as plt
+import re
 
 
 def create_lists_for_train_and_eval_metrics(file_path: str) -> dict:
@@ -11,28 +12,22 @@ def create_lists_for_train_and_eval_metrics(file_path: str) -> dict:
     """
     y_eval_loss = []
     y_eval_f1 = []
-    y_train_loss = []
 
     with open(file_path) as f:
         line = f.read()
+        line = line.replace('[', '')
+        line = line.replace(']', '')
         line = line.replace('}, ', '}\n')
         lines = line.split('\n')
 
-        for i in range(1, len(lines), 2):
+        for i in range(0, len(lines)-1):
             epoch_dict = eval(lines[i])
-            y_eval_f1.append(epoch_dict.get('eval_f1'))
+            y_eval_f1.append(epoch_dict.get('eval_f1_neg'))
             y_eval_loss.append(epoch_dict.get('eval_loss'))
-
-        for i in range(0, len(lines) - 1, 2):
-            if i == 0:
-                y_train_loss.append(eval(lines[i][1:]).get('loss'))
-            else:
-                epoch_dict = eval(lines[i])
-                y_train_loss.append(epoch_dict.get('loss'))
 
         f.close()
 
-    return {'f1': y_eval_f1, 'eval_loss': y_eval_loss, 'train_loss': y_train_loss}
+    return {'f1': y_eval_f1, 'eval_loss': y_eval_loss}
 
 
 def plot_f1(y: dict, lr: str, wr: str, model_name: str) -> None:
@@ -50,18 +45,17 @@ def plot_f1(y: dict, lr: str, wr: str, model_name: str) -> None:
     f1_max = 0
     key_max = 0
     epoch_max = 0
-    for key, list in y.items():
-        for f1 in list:
+    for key, f1_list in y.items():
+        for f1 in f1_list:
             if float(f1) > f1_max:
                 f1_max = f1
-                epoch_max = list.index(f1_max) + 1
+                epoch_max = f1_list.index(f1_max) + 1
                 key_max = key
 
     x = []
-    for i in range(1, len(y['adafactor']) + 1):
+    for i in range(1, len(list(y.values())[0]) + 1):
         x.append(i)
 
-    print(y)
     plt.plot(x, y['adamw_0'], label='adamw_hf, WD=0', color='hotpink')
     plt.plot(x, y['adamw_0.01'], label='adamw_hf, WD=0.01', color='turquoise')
     plt.plot(x, y['adamw_0.1'], label='adamw_hf, WD=0.1', color='gold')
@@ -75,6 +69,7 @@ def plot_f1(y: dict, lr: str, wr: str, model_name: str) -> None:
     plt.ylim((0, 1))
     plt.grid(linestyle='--')
     plt.savefig(f'../figures/{model_name}_LR{lr}_WR{wr}.jpg')
+    plt.clf()
 
 
 def plot_from_file(file_names: List[str]) -> None:
@@ -99,7 +94,7 @@ def plot_from_file(file_names: List[str]) -> None:
         wr = split_file_name[5][2:]
         optimizer = split_file_name[6][5:]
         if optimizer == 'adamw':
-            wd = split_file_name[8][2:-4]
+            wd = re.sub('[a-zA-zæøåÆØÅ]', '', split_file_name[8])
 
         dict_key = f'{optimizer}_{wd}' if optimizer == 'adamw' else f'{optimizer}'
 

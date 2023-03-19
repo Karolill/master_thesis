@@ -60,7 +60,7 @@ def compute_metrics(eval_pred):
         pos_label=0,
     )
 
-    return {'f1_neg': f1, 'precision_neg': precision}
+    return {'f1_neg': f1['f1'], 'precision_neg': precision['precision']}
 
 
 def create_and_train_model(
@@ -154,8 +154,8 @@ if __name__ == "__main__":
     arg = parser.add_argument
 
     # These arguments will allow you to specify which model you are using from the terminal
-    arg("--model_path", default='NbAiLab/nb-bert-large')
-    arg("--model_name", default='nb-bert')
+    arg("--model_path", default='ltg/norbert2')
+    arg("--model_name", default='norbert')
 
     args = parser.parse_args()
     model_path = args.model_path
@@ -229,4 +229,4 @@ if __name__ == "__main__":
                     eval_scores_addresses.append(eval_scores)
 
             plot_from_file(eval_scores_addresses)
-            eval_scores_addresses = []
+            eval_scores_addresses.clear()

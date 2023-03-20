@@ -1,9 +1,11 @@
 import time
 from typing import List
 import pandas as pd
-import sklearn
+from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
 import argparse
 from datasets import load_dataset
+from re import sub
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
@@ -30,9 +32,12 @@ def predict_from_fine_tuned_model(model_path: str, test_dataset: List[str]) -> p
     fetched_tokenizer = AutoTokenizer.from_pretrained(model_path)
 
     # Create a classifier
-    classifier = pipeline(task='sentiment-analysis', model=fetched_model, tokenizer=fetched_tokenizer, device=0)
+    gpu = 0 if device == 'cuda' else -1
+    print(gpu)
+    print(device)
+    classifier = pipeline(task='sentiment-analysis', model=fetched_model, tokenizer=fetched_tokenizer, device=gpu)
 
-    # The input can not be too big, set to the same size as used during fine-tuning
+    # max_length is set because bert models can only take an input of 512 tokens
     tokenizer_kwargs = {'padding': True, 'truncation': True, 'max_length': 512}
     result = classifier(test_dataset, **tokenizer_kwargs)
 
@@ -46,13 +51,12 @@ def predict_from_fine_tuned_model(model_path: str, test_dataset: List[str]) -> p
     return result_df
 
 
-def report_evaluation(predicted_labels_string: List[str], actual_labels: List[int], model_name: str,) -> None:
+def report_evaluation(predicted_labels_string: List[str], actual_labels: List[int],) -> None:
     """
     Evaluate the predictions made by the model, and print the evaluation.
     Args:
         :param predicted_labels_string: a list containing the labels predicted by the model
         :param actual_labels: the actual labels of the dataset
-        :param model_name: the name of the model used for prediction
     :returns None
     """
 
@@ -63,15 +67,38 @@ def report_evaluation(predicted_labels_string: List[str], actual_labels: List[in
         else:
             predicted_labels.append(1)
 
-    test_results = sklearn.metrics.classification_report(actual_labels, predicted_labels)
-    path = f'../scores/scores_final_tuning/state_{model_name}'
-    text_file = open(path, 'w')
-    n = text_file.write(test_results)
-    text_file.close()
+    test_results = classification_report(actual_labels, predicted_labels)
+    path = f'../scores/scores_final_tuning/test_{model_name}_LR{lr}_WR{wr}_OPTIM{optimizer}_WD{wd}'
+    results_file = open(path, 'w')
+    results_file.write(test_results)
+    results_file.close()
     print(test_results)
+
+    confusion_matrix_results = confusion_matrix(actual_labels, predicted_labels, normalize='true')
+    cm_display = ConfusionMatrixDisplay(confusion_matrix=confusion_matrix_results,
+                                        display_labels=['Negative', 'Positive'],)
+    cm_display = cm_display.plot(cmap=plt.cm.RdPu)
+    cm_display.figure_.savefig(f'../figures/confusion_matrix_{model_name}_LR{lr}_WR{wr}_OPTIM{optimizer}_WD{wd}.png',
+                               dpi='figure')
+    cm_display.figure_.clf()
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    arg = parser.add_argument
+
+    arg('--model_path', default='../models/models_final_tuning/norbert_LR2e-05_WR0_OPTIMadamw_hf_WD0')
+
+    args = parser.parse_args()
+    model_path = args.model_path
+
+    model_info = model_path.split('/')
+    split_model_path = model_info[3].split('_')
+    model_name = split_model_path[0]
+    lr = split_model_path[1][2:]
+    wr = split_model_path[2][2:]
+    optimizer = split_model_path[3][5:]
+    wd = sub('[a-zA-zæøåÆØÅ]', '', split_model_path[5])
 
     # Load test dataset. Due to format after load_dataset is used, ['train']['text'] is necessary to create a List[str]
     test = load_dataset('csv', data_files='../norec_preprocessed/test_norec_dataset.csv')
@@ -79,14 +106,14 @@ if __name__ == '__main__':
     test_labels = test['train']['label']
 
     start_time = time.time()
-    results = predict_from_fine_tuned_model(fine_tuned_model_directory, test_texts)
+    results = predict_from_fine_tuned_model(model_path, test_texts)
     runtime = time.time() - start_time
 
     # save runtime for predictions
-    time_string = f'Time used to do evaluation with {model_name} with LR {lr}: {runtime}'
-    path = f'../scores/scores_try10/testTime_{model_name}_LR{lr}'
+    time_string = f'Time used to do evaluation with {model_name}: {runtime}'
+    path = f'../scores/scores_final_tuning/testTime_{model_name}_LR{lr}_WR{wr}_OPTIM{optimizer}_WD{wd}'
     time_file = open(path, 'w')
-    m = time_file.write(time_string)
+    time_file.write(time_string)
     time_file.close()
 
     # Compare predictions to real values

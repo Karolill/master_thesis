@@ -147,6 +147,5 @@ if __name__ == '__main__':
         confusion_matrix_results = confusion_matrix(y_test, y_pred, normalize='true')
         cm_display = ConfusionMatrixDisplay(confusion_matrix=confusion_matrix_results,
                                             display_labels=['Negative', 'Positive'])
-
-        cm_display.plot()
+        cm_display = cm_display.plot(cmap=plt.cm.RdPu)
         plt.show()

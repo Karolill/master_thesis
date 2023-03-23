@@ -32,7 +32,8 @@ def predict_from_fine_tuned_model(model_path: str, test_dataset: List[str]) -> p
     fetched_tokenizer = AutoTokenizer.from_pretrained(model_path)
 
     # Create a classifier
-    gpu = 0 if device == 'cuda' else -1
+    gpu = 0 if device.type == 'cuda' else -1
+    print(gpu)
     classifier = pipeline(task='sentiment-analysis', model=fetched_model, tokenizer=fetched_tokenizer, device=gpu)
 
     # max_length is set because bert models can only take an input of 512 tokens

@@ -22,8 +22,9 @@ def create_lists_for_train_and_eval_metrics(file_path: str) -> dict:
 
         for i in range(0, len(lines)-1):
             epoch_dict = eval(lines[i])
-            y_eval_f1.append(epoch_dict.get('eval_f1_neg'))
-            y_eval_loss.append(epoch_dict.get('eval_loss'))
+            if 'eval_loss' in epoch_dict:
+                y_eval_f1.append(epoch_dict.get('eval_f1_neg'))
+                y_eval_loss.append(epoch_dict.get('eval_loss'))
 
         f.close()
 
@@ -85,7 +86,6 @@ def plot_from_file(file_names: List[str]) -> None:
     wd = 0
     wr = 0
     model_name = 0
-
     for file_name in file_names:
         # Get necessary info for naming later
         split_file_name = file_name.split('_')
@@ -97,10 +97,7 @@ def plot_from_file(file_names: List[str]) -> None:
             wd = re.sub('[a-zA-zæøåÆØÅ]', '', split_file_name[8])
 
         dict_key = f'{optimizer}_{wd}' if optimizer == 'adamw' else f'{optimizer}'
-
-        # Get f1-score
         dict_value = create_lists_for_train_and_eval_metrics(file_name)['f1']
-
         score_dict[dict_key] = dict_value
 
     plot_f1(score_dict, lr, wr, model_name)

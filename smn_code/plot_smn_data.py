@@ -3,9 +3,9 @@ import numpy as np
 
 
 if __name__ == '__main__':
-    labels = ['Train', 'Test']
-    neg_percentages = [50, round(438/(1980+438)*100, 1)]
-    pos_percentages = [50, round(1980/(1980+438)*100, 1)]
+    labels = ['Train', 'Validation', 'Test']
+    neg_percentages = [50, round(88/(88+396)*100, 1), round(350/(1584+350)*100, 1)]
+    pos_percentages = [50, round(396/(88+396)*100, 1), round(1584/(1584+350)*100, 1)]
 
     x = np.arange(len(labels))  # the label locations
     width = 0.25  # the width of the bars

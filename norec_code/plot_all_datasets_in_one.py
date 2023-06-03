@@ -102,4 +102,6 @@ if __name__ == '__main__':
 
     plt.grid(visible=True, color='grey', linestyle='-.', linewidth=0.5, alpha=0.6)
 
+    plt.savefig(f'../figures/norec_distribution_all_datasets_combined.pdf')
     plt.show()
+    plt.clf()

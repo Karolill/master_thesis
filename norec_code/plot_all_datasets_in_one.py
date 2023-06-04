@@ -5,6 +5,9 @@ import pandas as pd
 from typing import List, Tuple
 import matplotlib.pyplot as plt
 
+# This file contain the code to create a bar chart where the distribution of labels (dice rolls) in all datasets
+# are plot in the same figure.
+
 
 def read_reviews(folderpath: str) -> Tuple[List[str], List[str]]:
     """

@@ -38,7 +38,7 @@ def read_reviews(folderpath: str) -> Tuple[List[str], List[str]]:
 
 # Get the scores and make binary labels
 # Retrieve the correct scores from the `metadata.json` file and turn all scores from 1-2 to 0,
-# and all from 3-6 to 1. Also, the categories must be kept so that we can filter on those later.
+# and all from 5-6 to 1. Also, the categories must be kept so that we can filter on those later.
 
 def get_sentiments(filenames: List[str]) -> List[int]:
     """
@@ -80,36 +80,37 @@ def create_dataframe(texts: List[str], sentiments: List[int]) -> pd.DataFrame:
     return df
 
 
-# Create train dataset
-print("Create trainining dataset...")
-reviews_train, filenames_train = read_reviews('../norec_original/data/train')
-sentiments_train = get_sentiments(filenames_train)
-train_df = create_dataframe(reviews_train, sentiments_train)
-train_df.to_csv('../norec_preprocessed_no_neutral/train_norec_dataset.csv', index=False)
-print(f"Training dataset done. \n{train_df.value_counts('label')}\n\n")
+if __name__ == '__main__':
+    # Create train dataset
+    print("Create trainining dataset...")
+    reviews_train, filenames_train = read_reviews('../norec_original/data/train')
+    sentiments_train = get_sentiments(filenames_train)
+    train_df = create_dataframe(reviews_train, sentiments_train)
+    train_df.to_csv('../norec_preprocessed_no_neutral/train_norec_dataset.csv', index=False)
+    print(f"Training dataset done. \n{train_df.value_counts('label')}\n\n")
 
-# Will also create a balanced training dataset with 4000 examples:
-print("Create balanced trainining dataset...")
-train_0 = train_df[train_df['label'] == 0]
-train_1 = train_df[train_df['label'] == 1]
-train_0_small = train_0.head(2000)
-train_1_small = train_1.head(2000)
-train_balanced_df = pd.concat([train_0_small, train_1_small])
-train_balanced_df.to_csv('../norec_preprocessed_no_neutral/train_balanced_norec_dataset.csv', index=False)
-print(f"Balanced training dataset done. \n{train_balanced_df.value_counts('label')}\n\n")
+    # Will also create a balanced training dataset with 4000 examples:
+    print("Create balanced trainining dataset...")
+    train_0 = train_df[train_df['label'] == 0]
+    train_1 = train_df[train_df['label'] == 1]
+    train_0_small = train_0.head(2000)
+    train_1_small = train_1.head(2000)
+    train_balanced_df = pd.concat([train_0_small, train_1_small])
+    train_balanced_df.to_csv('../norec_preprocessed_no_neutral/train_balanced_norec_dataset.csv', index=False)
+    print(f"Balanced training dataset done. \n{train_balanced_df.value_counts('label')}\n\n")
 
-# Create evaluation dataset
-print("Create evaluation dataset...")
-reviews_eval, filenames_eval = read_reviews('../norec_original/data/dev')
-sentiments_eval = get_sentiments(filenames_eval)
-eval_df = create_dataframe(reviews_eval, sentiments_eval)
-eval_df.to_csv('../norec_preprocessed_no_neutral/eval_norec_dataset.csv', index=False)
-print(f"Evaluation dataset done. \n{eval_df.value_counts('label')}\n\n")
+    # Create evaluation dataset
+    print("Create evaluation dataset...")
+    reviews_eval, filenames_eval = read_reviews('../norec_original/data/dev')
+    sentiments_eval = get_sentiments(filenames_eval)
+    eval_df = create_dataframe(reviews_eval, sentiments_eval)
+    eval_df.to_csv('../norec_preprocessed_no_neutral/eval_norec_dataset.csv', index=False)
+    print(f"Evaluation dataset done. \n{eval_df.value_counts('label')}\n\n")
 
-# Create test dataset
-print("Create test dataset...")
-reviews_test, filenames_test = read_reviews('../norec_original/data/test')
-sentiments_test = get_sentiments(filenames_test)
-test_df = create_dataframe(reviews_test, sentiments_test)
-test_df.to_csv('../norec_preprocessed_no_neutral/test_norec_dataset.csv', index=False)
-print(f"Test dataset done. \n{test_df.value_counts('label')}\n\n")
+    # Create test dataset
+    print("Create test dataset...")
+    reviews_test, filenames_test = read_reviews('../norec_original/data/test')
+    sentiments_test = get_sentiments(filenames_test)
+    test_df = create_dataframe(reviews_test, sentiments_test)
+    test_df.to_csv('../norec_preprocessed_no_neutral/test_norec_dataset.csv', index=False)
+    print(f"Test dataset done. \n{test_df.value_counts('label')}\n\n")

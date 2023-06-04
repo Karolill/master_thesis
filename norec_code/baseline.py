@@ -57,7 +57,7 @@ def grid_search(classifier: object, params: dict, train_vectorized) -> None:
     """
     Function to perform grid search on a model.
     Args:
-        classifier: the model to tune, such as SVC() etc.
+        classifier: an sklearn model to tune, such as SVC() etc.
         params: the parameters to tune, and values to try. Format: 'model_name__parameter_name': [val1, val2,...]
         train_vectorized: the training data to use, should be vectorized
     Returns:
@@ -97,12 +97,12 @@ if __name__ == '__main__':
 
     vectorized_train = feature_pipe.fit_transform(X_train)
 
-    # Model training is done with a separate pipeline, so it does not have to be do normalization/vectorization
+    # Model training is done with a separate pipeline, so it does not have to do normalization/vectorization
     # for every combination of parameters (as the texts won't change anyway)
 
     param_svc = {
         'clf__C': [0.01, 0.1, 1, 10, 100, 1000],  # C increases -> fewer mistakes and more complex margin
-        'clf__gamma': [0.01, 0.1, 1, 10, 100, 1000],  # gamma increases -> each examples influence gets shorter
+        'clf__gamma': [0.01, 0.1, 1, 10, 100, 1000],  # gamma increases -> each example's influence gets shorter
     }
 
     param_logistic_regression = {
@@ -130,6 +130,7 @@ if __name__ == '__main__':
 
     vectorized_test = feature_pipe.transform(X_test)
 
+    # Use the best parameters to train the models, then test them and plot confusion matrices and evaluation metrics:
     for classifier in classifiers:
         clf_pipe = Pipeline([
             ('clf', classifier)

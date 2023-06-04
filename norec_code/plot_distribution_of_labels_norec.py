@@ -5,6 +5,8 @@ from typing import List, Tuple
 import matplotlib.pyplot as plt
 
 
+# Code to plot distribution of scores (dice rolls) in the two training datasets
+
 def read_reviews(folderpath: str) -> Tuple[List[str], List[str]]:
     """
     Read the text from all files in the folder.
@@ -64,9 +66,9 @@ if __name__ == '__main__':
     # To check NoReC train balanced, add the following:
     train_0 = df[(df['sentiments'] == 1) | (df['sentiments'] == 2)]
     # Use the line below for NoReC full:
-    train_1 = df[(df['sentiments'] == 3) | (df['sentiments'] == 4) | (df['sentiments'] == 5) | (df['sentiments'] == 6)]
+    # train_1 = df[(df['sentiments'] == 3) | (df['sentiments'] == 4) | (df['sentiments'] == 5) | (df['sentiments'] == 6)]
     # Or use the following line for NoReC no neutral
-    # train_1 = df[(df['sentiments'] == 5) | (df['sentiments'] == 6)]
+    train_1 = df[(df['sentiments'] == 5) | (df['sentiments'] == 6)]
     train_0_small = train_0.head(2000)
     train_1_small = train_1.head(2000)
     df = pd.concat([train_0_small, train_1_small])
@@ -74,11 +76,11 @@ if __name__ == '__main__':
     count_df = df.value_counts(sort=False).rename_axis('Label').reset_index(name='counts')
     count_df['percentage'] = (count_df['counts'] / count_df['counts'].sum()) * 100
     # Add the 5 lines below for norec no neutral:
-    # threes = pd.DataFrame({'Label': [3], 'counts': [0], 'percentage': [0]})
-    # fours = pd.DataFrame({'Label': [4], 'counts': [0], 'percentage': [0]})
-    # count_df = pd.concat([count_df, threes])
-    # count_df = pd.concat([count_df, fours])
-    # count_df.sort_values('Label', inplace=True)
+    threes = pd.DataFrame({'Label': [3], 'counts': [0], 'percentage': [0]})
+    fours = pd.DataFrame({'Label': [4], 'counts': [0], 'percentage': [0]})
+    count_df = pd.concat([count_df, threes])
+    count_df = pd.concat([count_df, fours])
+    count_df.sort_values('Label', inplace=True)
 
     count_df.plot(kind='bar',
                   x='Label',
@@ -87,8 +89,8 @@ if __name__ == '__main__':
                   legend=False,
                   ylabel='Percentage',
                   rot=0,
-                  zorder=2,)
+                  zorder=2, )
     plt.grid(visible=True, color='grey', linestyle='-.', linewidth=0.5, alpha=0.6, zorder=-1.0)
-    # Remove if percentage is over 40 in a plot
-    plt.ylim(0, 40)
+
+    plt.savefig(f'../figures/norec_train_no_neutral_balanced_dice_distribution.pdf')
     plt.show()

@@ -3,9 +3,11 @@ import matplotlib.pyplot as plt
 import re
 
 
+# Code to create plots that show the evaluation score after epoch 1-5, for multiple models.
+
 def create_lists_for_train_and_eval_metrics(file_path: str) -> dict:
     """
-    Create lists containing the train loss, and eval loss and f1-score for each epoch of training.
+    Create a dictionary of lists containing the eval loss and f1-score of the negative class for each epoch of training.
     :param file_path: The path to the file containing the info. File-structure should be as you get by trainer.state.
     log_history.
     :return: dictionary with lists of f1-score on eval dataset and loss on train and eval dataset from each epoch.

@@ -59,6 +59,7 @@ def report_evaluation(predicted_labels_string: List[str], actual_labels: List[in
     :returns None
     """
 
+    # The labels in the dataset are 0/1, but the BERT models return 'LABEL_0' or 'LABEL_1'
     predicted_labels = []
     for prediction in predicted_labels_string:
         if prediction == 'LABEL_0':
@@ -91,6 +92,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     model_path = args.model_path
 
+    # So that I won't have to manually input much info, the file name is used to get the neccessary info.
     model_info = model_path.split('/')
     split_model_path = model_info[3].split('_')
     model_name = split_model_path[0]

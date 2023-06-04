@@ -38,4 +38,6 @@ if __name__ == '__main__':
 
     fig.tight_layout()
 
+    plt.savefig(f'../figures/smn_datasets_2.pdf')
     plt.show()
+    plt.clf()

@@ -104,7 +104,7 @@ def create_and_train_model(
         optim=optimizer,
         evaluation_strategy='epoch',
         num_train_epochs=epochs,
-        load_best_model_at_end=True,  # Add this and next two lines so the best model will be saved
+        load_best_model_at_end=True,  # Add this and next two lines so the best model will be saved in the end
         metric_for_best_model='f1_neg',
         save_strategy='epoch',
     )
